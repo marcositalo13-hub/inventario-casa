@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { sair } from "@/app/actions";
 import { NavLinks } from "@/components/nav-links";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { createClient } from "@/lib/supabase/server";
 
 async function UsuarioRodape() {
@@ -28,21 +30,26 @@ async function UsuarioRodape() {
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="fixed inset-y-0 left-0 flex w-60 flex-col border-r border-border bg-sidebar">
-        <div className="px-4 py-4 text-sm font-semibold">Inventário</div>
-        <NavLinks />
-        <div className="mt-auto">
-          <Suspense fallback={<div className="h-[73px] border-t border-border" />}>
-            <UsuarioRodape />
-          </Suspense>
+    <TooltipProvider>
+      <div className="flex min-h-screen">
+        <aside className="fixed inset-y-0 left-0 flex w-60 flex-col border-r border-border bg-sidebar">
+          <div className="px-4 py-4 text-sm font-semibold">Inventário</div>
+          <NavLinks />
+          <div className="mt-auto">
+            <Suspense
+              fallback={<div className="h-[73px] border-t border-border" />}
+            >
+              <UsuarioRodape />
+            </Suspense>
+          </div>
+        </aside>
+        <div className="ml-60 flex-1">
+          <main className="mx-auto max-w-[960px] px-8 pt-12 pb-12">
+            {children}
+          </main>
         </div>
-      </aside>
-      <div className="ml-60 flex-1">
-        <main className="mx-auto max-w-[960px] px-8 pt-12 pb-12">
-          {children}
-        </main>
       </div>
-    </div>
+      <Toaster position="bottom-right" />
+    </TooltipProvider>
   );
 }
