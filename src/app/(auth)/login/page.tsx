@@ -43,8 +43,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+    <main className="flex flex-1 items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm border border-border shadow-none ring-0">
         <CardHeader>
           <CardTitle>Inventário da Casa</CardTitle>
           <CardDescription>Entre com seu e-mail e senha.</CardDescription>
