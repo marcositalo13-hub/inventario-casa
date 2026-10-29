@@ -81,6 +81,25 @@ export function parseNumero(
   return { ok: true, numero: n };
 }
 
+/** Ids do local e de todos os seus descendentes. */
+export function idsComDescendentes(
+  id: string,
+  locais: Pick<LocalRow, "id" | "parent_id">[],
+): string[] {
+  const filhos = new Map<string, string[]>();
+  for (const l of locais) {
+    if (l.parent_id) filhos.set(l.parent_id, [...(filhos.get(l.parent_id) ?? []), l.id]);
+  }
+  const ids: string[] = [];
+  const pilha = [id];
+  while (pilha.length) {
+    const atual = pilha.pop()!;
+    ids.push(atual);
+    pilha.push(...(filhos.get(atual) ?? []));
+  }
+  return ids;
+}
+
 function compararLocais(a: LocalRow, b: LocalRow): number {
   if (a.tipo_sigla !== b.tipo_sigla) {
     return a.tipo_sigla < b.tipo_sigla ? -1 : 1;

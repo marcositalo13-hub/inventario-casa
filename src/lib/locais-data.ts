@@ -4,7 +4,7 @@ import type { LocalRow, TipoLocal } from "@/lib/locais";
 const PAGINA = 1000;
 
 // O PostgREST limita o número de linhas por resposta; busca em páginas.
-async function buscarTodos<T>(
+export async function buscarTodos<T>(
   consulta: (de: number, ate: number) => PromiseLike<{
     data: T[] | null;
     error: { message: string } | null;

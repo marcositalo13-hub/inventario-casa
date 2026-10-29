@@ -2,45 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 import type { PostgrestError } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import {
+  ERRO_GENERICO,
+  ERRO_SESSAO,
+  clienteAutenticado,
+  logarErroDb,
+  mensagemErroDb,
+  type ClienteAutenticado,
+  type Resultado,
+} from "@/lib/acoes";
 import { SIGLA_REGEX, formatCodigo, parseNumero } from "@/lib/locais";
+import { texto } from "@/lib/utils";
 
-export type Resultado = { ok: true } | { ok: false; erro: string };
-
-const ERRO_GENERICO = "Não foi possível concluir a operação.";
 const ERRO_COMBINACAO = "Combinação inválida de tipo e local.";
-
-async function clienteAutenticado() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user ? supabase : null;
-}
-
-function texto(valor: unknown): string | null {
-  if (typeof valor !== "string") return null;
-  const t = valor.trim();
-  return t === "" ? null : t;
-}
-
-function logar(contexto: string, error: PostgrestError) {
-  console.error(`[locais] ${contexto}:`, error.code, error.message, error.details);
-}
 
 /** Mapeia erros do banco em escrita de local. */
 function erroLocal(contexto: string, error: PostgrestError, codigo: string): string {
-  logar(contexto, error);
-  if (error.code === "23505") return `Já existe ${codigo} dentro deste local.`;
   // Exceções do trigger (raise exception), checks e FKs do pai/tipo.
-  if (["P0001", "23514", "23503"].includes(error.code)) return ERRO_COMBINACAO;
-  return ERRO_GENERICO;
+  return mensagemErroDb(`locais: ${contexto}`, error, {
+    "23505": `Já existe ${codigo} dentro deste local.`,
+    P0001: ERRO_COMBINACAO,
+    "23514": ERRO_COMBINACAO,
+    "23503": ERRO_COMBINACAO,
+  });
 }
 
-async function buscarTipo(
-  supabase: NonNullable<Awaited<ReturnType<typeof clienteAutenticado>>>,
-  sigla: unknown,
-) {
+async function buscarTipo(supabase: ClienteAutenticado, sigla: unknown) {
   if (typeof sigla !== "string" || !SIGLA_REGEX.test(sigla)) return null;
   const { data } = await supabase
     .from("tipos_local")
@@ -63,7 +50,7 @@ export type LocalInput = {
 
 export async function criarLocal(input: LocalInput): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
 
   const numero = parseNumero(input?.numero);
   if (!numero.ok) return { ok: false, erro: "Número deve ser um inteiro de 1 a 99." };
@@ -97,7 +84,7 @@ export type LocalEdicao = {
 
 export async function editarLocal(input: LocalEdicao): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
 
   if (typeof input?.id !== "string") return { ok: false, erro: "Local não encontrado." };
 
@@ -134,16 +121,17 @@ export async function editarLocal(input: LocalEdicao): Promise<Resultado> {
 
 export async function excluirLocal(id: string): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
   if (typeof id !== "string") return { ok: false, erro: "Local não encontrado." };
 
   const { data, error } = await supabase.from("locais").delete().eq("id", id).select("id");
   if (error) {
-    logar("excluir", error);
-    if (error.code === "23503") {
-      return { ok: false, erro: "Não é possível excluir: há locais ou itens dentro deste." };
-    }
-    return { ok: false, erro: ERRO_GENERICO };
+    return {
+      ok: false,
+      erro: mensagemErroDb("locais: excluir", error, {
+        "23503": "Não é possível excluir: há locais ou itens dentro deste.",
+      }),
+    };
   }
   if (!data?.length) return { ok: false, erro: "Local não encontrado." };
 
@@ -159,7 +147,7 @@ export type SiglaInput = { sigla: string; nome: string; ehComodo: boolean };
 
 export async function criarSigla(input: SiglaInput): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
 
   const sigla = typeof input?.sigla === "string" ? input.sigla.trim().toUpperCase() : "";
   if (!SIGLA_REGEX.test(sigla)) {
@@ -172,12 +160,13 @@ export async function criarSigla(input: SiglaInput): Promise<Resultado> {
     .from("tipos_local")
     .insert({ sigla, nome, eh_comodo: input.ehComodo === true });
   if (error) {
-    logar("criar sigla", error);
-    if (error.code === "23505") return { ok: false, erro: `Já existe a sigla ${sigla}.` };
-    if (error.code === "23514") {
-      return { ok: false, erro: "Sigla deve ter de 2 a 4 letras maiúsculas (A–Z)." };
-    }
-    return { ok: false, erro: ERRO_GENERICO };
+    return {
+      ok: false,
+      erro: mensagemErroDb("siglas: criar", error, {
+        "23505": `Já existe a sigla ${sigla}.`,
+        "23514": "Sigla deve ter de 2 a 4 letras maiúsculas (A–Z).",
+      }),
+    };
   }
 
   revalidatePath("/locais");
@@ -186,7 +175,7 @@ export async function criarSigla(input: SiglaInput): Promise<Resultado> {
 
 export async function editarSigla(input: { sigla: string; nome: string }): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
 
   if (typeof input?.sigla !== "string") return { ok: false, erro: "Sigla não encontrada." };
   const nome = texto(input.nome);
@@ -199,8 +188,7 @@ export async function editarSigla(input: { sigla: string; nome: string }): Promi
     .eq("sigla", input.sigla)
     .select("sigla");
   if (error) {
-    logar("editar sigla", error);
-    return { ok: false, erro: ERRO_GENERICO };
+    return { ok: false, erro: mensagemErroDb("siglas: editar", error, {}) };
   }
   if (!data?.length) return { ok: false, erro: "Sigla não encontrada." };
 
@@ -210,7 +198,7 @@ export async function editarSigla(input: { sigla: string; nome: string }): Promi
 
 export async function excluirSigla(sigla: string): Promise<Resultado> {
   const supabase = await clienteAutenticado();
-  if (!supabase) return { ok: false, erro: "Sessão expirada. Entre novamente." };
+  if (!supabase) return { ok: false, erro: ERRO_SESSAO };
   if (typeof sigla !== "string") return { ok: false, erro: "Sigla não encontrada." };
 
   const { data, error } = await supabase
@@ -219,7 +207,7 @@ export async function excluirSigla(sigla: string): Promise<Resultado> {
     .eq("sigla", sigla)
     .select("sigla");
   if (error) {
-    logar("excluir sigla", error);
+    logarErroDb("siglas: excluir", error);
     if (error.code === "23503") {
       const { count } = await supabase
         .from("locais")

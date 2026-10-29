@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -20,14 +21,29 @@ const links: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/pessoas", label: "Pessoas", icon: Users },
 ];
 
+// Em rotas com parâmetro dinâmico (/itens/[id]) o pathname só existe na
+// requisição; o fallback mantém os links no shell estático, sem destaque.
 export function NavLinks() {
-  const pathname = usePathname();
+  return (
+    <Suspense fallback={<Links pathname={null} />}>
+      <LinksComDestaque />
+    </Suspense>
+  );
+}
 
+function LinksComDestaque() {
+  return <Links pathname={usePathname()} />;
+}
+
+function Links({ pathname }: { pathname: string | null }) {
   return (
     <nav className="flex flex-col gap-0.5 px-2">
       {links.map(({ href, label, icon: Icon }) => {
         const active =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+          pathname !== null &&
+          (href === "/"
+            ? pathname === "/"
+            : pathname === href || pathname.startsWith(`${href}/`));
         return (
           <Link
             key={href}
