@@ -3,10 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { SemLocalTag } from "@/components/endereco-tag";
 import { Combobox } from "@/components/itens/combobox";
 import { opcoesCategoria, opcoesLocal } from "@/components/itens/opcoes";
 import { Input } from "@/components/ui/input";
-import type { CategoriaRow } from "@/lib/itens";
+import { SEM_LOCAL, type CategoriaRow } from "@/lib/itens";
 import type { LocalRow } from "@/lib/locais";
 
 export type Filtros = { q: string; local: string | null; categoria: string | null };
@@ -26,7 +27,13 @@ export function FiltrosItens({
   const [q, setQ] = useState(filtros.q);
   const espera = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const opcoesLoc = useMemo(() => opcoesLocal(locais), [locais]);
+  const opcoesLoc = useMemo(
+    () => [
+      { id: SEM_LOCAL, busca: ["Sem local"], conteudo: <SemLocalTag /> },
+      ...opcoesLocal(locais),
+    ],
+    [locais],
+  );
   const opcoesCat = useMemo(() => opcoesCategoria(categorias), [categorias]);
 
   function aplicar(novos: Filtros) {

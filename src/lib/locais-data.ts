@@ -45,7 +45,7 @@ export async function carregarLocais(
           .order("id")
           .range(de, ate),
     ),
-    buscarTodos<{ local_id: string }>((de, ate) =>
+    buscarTodos<{ local_id: string | null }>((de, ate) =>
       supabase.from("itens").select("local_id").order("id").range(de, ate),
     ),
   ]);
@@ -55,6 +55,7 @@ export async function carregarLocais(
   const porId = new Map(enderecos.map((e) => [e.id, e]));
   const contagem = new Map<string, number>();
   for (const { local_id } of itens) {
+    if (local_id === null) continue;
     contagem.set(local_id, (contagem.get(local_id) ?? 0) + 1);
   }
 

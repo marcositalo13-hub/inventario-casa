@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ItemForm } from "@/components/itens/item-form";
 import { UUID_REGEX } from "@/lib/itens";
-import { carregarCategorias, carregarItem, carregarPessoas } from "@/lib/itens-data";
+import {
+  carregarCategorias,
+  carregarItem,
+  carregarPessoas,
+  contarItensSemLocal,
+} from "@/lib/itens-data";
 import { carregarLocais } from "@/lib/locais-data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,11 +16,12 @@ async function Formulario({ params }: { params: PageProps<"/itens/[id]">["params
   if (!UUID_REGEX.test(id)) notFound();
 
   const supabase = await createClient();
-  const [item, { locais }, categorias, pessoas] = await Promise.all([
+  const [item, { locais }, categorias, pessoas, semLocal] = await Promise.all([
     carregarItem(supabase, id),
     carregarLocais(supabase),
     carregarCategorias(supabase),
     carregarPessoas(supabase),
+    contarItensSemLocal(supabase),
   ]);
   if (!item) notFound();
 
@@ -25,6 +31,7 @@ async function Formulario({ params }: { params: PageProps<"/itens/[id]">["params
       categorias={categorias}
       locais={locais}
       pessoas={pessoas}
+      semLocal={semLocal}
       item={item}
     />
   );

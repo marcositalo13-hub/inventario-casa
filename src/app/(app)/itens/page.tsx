@@ -4,8 +4,9 @@ import { Plus } from "lucide-react";
 import { FiltrosItens, type Filtros } from "@/components/itens/filtros-itens";
 import { TabelaItens, type LinhaItem } from "@/components/itens/tabela-itens";
 import { buttonVariants } from "@/components/ui/button";
-import { carregarCategorias, listarItens } from "@/lib/itens-data";
+import { carregarCategorias, contarItensSemLocal, listarItens } from "@/lib/itens-data";
 import {
+  SEM_LOCAL,
   SITUACOES,
   corresponde,
   formatQuantidade,
@@ -22,6 +23,32 @@ function primeiro(valor: string | string[] | undefined): string | null {
   return v && v.trim() ? v.trim() : null;
 }
 
+/** Link que aplica o filtro "Sem local", mantendo a busca e a categoria. */
+async function LinkSemLocal({
+  searchParams,
+}: {
+  searchParams: PageProps<"/itens">["searchParams"];
+}) {
+  const params = await searchParams;
+  const total = await contarItensSemLocal(await createClient());
+  if (total === 0) return null;
+
+  const busca = new URLSearchParams({ local: SEM_LOCAL });
+  const q = primeiro(params.q);
+  const categoria = primeiro(params.categoria);
+  if (q) busca.set("q", q);
+  if (categoria) busca.set("categoria", categoria);
+
+  return (
+    <Link
+      href={`/itens?${busca}`}
+      className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+    >
+      {total} {total === 1 ? "item" : "itens"} sem local
+    </Link>
+  );
+}
+
 async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["searchParams"] }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -30,16 +57,18 @@ async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["sear
     carregarCategorias(supabase),
   ]);
 
+  const semLocal = primeiro(params.local) === SEM_LOCAL;
   const local = locais.find((l) => l.id === primeiro(params.local));
   const categoria = categorias.find((c) => c.id === primeiro(params.categoria));
   const filtros: Filtros = {
     q: primeiro(params.q) ?? "",
-    local: local?.id ?? null,
+    local: semLocal ? SEM_LOCAL : (local?.id ?? null),
     categoria: categoria?.id ?? null,
   };
 
   const itens = await listarItens(supabase, {
     localIds: local ? idsComDescendentes(local.id, locais) : null,
+    semLocal,
     categoriaIds: categoria ? idsCategoriaComSubs(categoria.id, categorias) : null,
   });
 
@@ -56,14 +85,15 @@ async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["sear
         id: i.id,
         nome: i.nome,
         categoria: cat ? rotuloCategoria(cat, categoriasPorId) : "",
-        endereco: locaisPorId.get(i.local_id)?.endereco ?? "",
+        endereco: i.local_id ? (locaisPorId.get(i.local_id)?.endereco ?? null) : null,
         quantidade: formatQuantidade(i.quantidade, i.unidade),
         situacao: rotulo(SITUACOES, i.situacao),
       };
     })
     .sort(
       (a, b) =>
-        a.endereco.localeCompare(b.endereco, "pt-BR") ||
+        // Sem local ("") vem primeiro.
+        (a.endereco ?? "").localeCompare(b.endereco ?? "", "pt-BR") ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
 
@@ -92,7 +122,12 @@ export default function ItensPage({ searchParams }: PageProps<"/itens">) {
   return (
     <>
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold">Itens</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-3xl font-semibold">Itens</h1>
+          <Suspense fallback={null}>
+            <LinkSemLocal searchParams={searchParams} />
+          </Suspense>
+        </div>
         <Link href="/itens/novo" className={buttonVariants()}>
           <Plus aria-hidden />
           Novo item

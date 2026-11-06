@@ -5,3 +5,11 @@ export function EnderecoTag({ endereco }: { endereco: string }) {
     </span>
   );
 }
+
+export function SemLocalTag() {
+  return (
+    <span className="inline-block rounded-[4px] border border-dashed border-border px-2 py-0.5 font-mono text-[13px] leading-snug tracking-[0.02em] text-muted-foreground">
+      Sem local
+    </span>
+  );
+}

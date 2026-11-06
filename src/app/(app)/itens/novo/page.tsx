@@ -1,17 +1,22 @@
 import { Suspense } from "react";
 import { ItemForm } from "@/components/itens/item-form";
-import { carregarCategorias, carregarPessoas } from "@/lib/itens-data";
+import {
+  carregarCategorias,
+  carregarPessoas,
+  contarItensSemLocal,
+} from "@/lib/itens-data";
 import { carregarLocais } from "@/lib/locais-data";
 import { createClient } from "@/lib/supabase/server";
 
 async function Formulario() {
   const supabase = await createClient();
-  const [{ locais }, categorias, pessoas] = await Promise.all([
+  const [{ locais }, categorias, pessoas, semLocal] = await Promise.all([
     carregarLocais(supabase),
     carregarCategorias(supabase),
     carregarPessoas(supabase),
+    contarItensSemLocal(supabase),
   ]);
-  return <ItemForm categorias={categorias} locais={locais} pessoas={pessoas} />;
+  return <ItemForm categorias={categorias} locais={locais} pessoas={pessoas} semLocal={semLocal} />;
 }
 
 export default function NovoItemPage() {

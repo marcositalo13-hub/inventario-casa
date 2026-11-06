@@ -108,6 +108,9 @@ export function naturezaDaCategoria(
   return categoria.natureza_padrao ?? pai?.natureza_padrao ?? "duravel";
 }
 
+/** Valor do filtro de local (?local=) para itens sem local. */
+export const SEM_LOCAL = "sem-local";
+
 /** Ids da categoria e de suas subcategorias (diretas). */
 export function idsCategoriaComSubs(id: string, categorias: CategoriaRow[]): string[] {
   return [id, ...categorias.filter((c) => c.parent_id === id).map((c) => c.id)];
@@ -259,7 +262,7 @@ export function validarAtributos(
 export type ItemInput = {
   nome: string;
   categoriaId: string;
-  localId: string;
+  localId: string | null;
   quantidade: string;
   unidade: string;
   marca: string;
@@ -282,7 +285,7 @@ export type ItemInput = {
 export type ItemDados = {
   nome: string;
   categoria_id: string;
-  local_id: string;
+  local_id: string | null;
   pessoa_id: string | null;
   natureza: Natureza;
   quantidade: number;
@@ -343,7 +346,7 @@ export function validarItem(
   if (!categoriaId || !UUID_REGEX.test(categoriaId)) return { ok: false, erro: "Escolha a categoria." };
 
   const localId = texto(input.localId);
-  if (!localId || !UUID_REGEX.test(localId)) return { ok: false, erro: "Escolha o local." };
+  if (localId && !UUID_REGEX.test(localId)) return { ok: false, erro: "Local inválido." };
 
   const quantidade = parseDecimalBR(input.quantidade);
   if (!quantidade.ok || quantidade.numero == null) {

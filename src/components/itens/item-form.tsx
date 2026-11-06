@@ -75,7 +75,7 @@ type Campos = {
   atributos: Record<string, ValorAtributo>;
 };
 
-type CampoObrigatorio = "nome" | "categoria" | "local" | "quantidade" | "unidade" | "emprestadoPara";
+type CampoObrigatorio = "nome" | "categoria" | "quantidade" | "unidade" | "emprestadoPara";
 
 function camposVazios(): Campos {
   return {
@@ -178,11 +178,14 @@ export function ItemForm({
   categorias,
   locais,
   pessoas,
+  semLocal,
   item,
 }: {
   categorias: CategoriaRow[];
   locais: LocalRow[];
   pessoas: PessoaRow[];
+  /** Total de itens sem local. */
+  semLocal: number;
   /** Presente na edição. */
   item?: ItemRow;
 }) {
@@ -204,7 +207,6 @@ export function ItemForm({
 
   const nomeRef = useRef<HTMLInputElement>(null);
   const categoriaRef = useRef<HTMLButtonElement>(null);
-  const localRef = useRef<HTMLButtonElement>(null);
   const quantidadeRef = useRef<HTMLInputElement>(null);
   const unidadeRef = useRef<HTMLInputElement>(null);
   const emprestadoRef = useRef<HTMLInputElement>(null);
@@ -247,7 +249,6 @@ export function ItemForm({
     const refs = {
       nome: nomeRef,
       categoria: categoriaRef,
-      local: localRef,
       quantidade: quantidadeRef,
       unidade: unidadeRef,
       emprestadoPara: emprestadoRef,
@@ -260,7 +261,6 @@ export function ItemForm({
     if (salvando) return;
     if (!campos.nome.trim()) return falhar("nome", "Informe o nome.");
     if (!campos.categoriaId) return falhar("categoria", "Escolha a categoria.");
-    if (!campos.localId) return falhar("local", "Escolha o local.");
     const qtd = parseDecimalBR(campos.quantidade);
     if (!qtd.ok || qtd.numero == null || qtd.numero < 0) {
       return falhar("quantidade", "Quantidade deve ser um número maior ou igual a 0.");
@@ -320,11 +320,11 @@ export function ItemForm({
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      {local && (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {local.itens} {local.itens === 1 ? "item" : "itens"} neste local
-        </p>
-      )}
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        {local
+          ? `${local.itens} ${local.itens === 1 ? "item" : "itens"} neste local`
+          : `${semLocal} ${semLocal === 1 ? "item" : "itens"} sem local`}
+      </p>
 
       <form
         onSubmit={aoEnviar}
@@ -365,16 +365,12 @@ export function ItemForm({
             <Label htmlFor="item-local">Local</Label>
             <Combobox
               id="item-local"
-              triggerRef={localRef}
               valor={campos.localId}
               opcoes={opcoesLoc}
-              onChange={(id) => {
-                setErro(null);
-                set("localId", id);
-              }}
-              placeholder="Escolha o local"
+              onChange={(id) => set("localId", id)}
+              placeholder="Sem local (definir depois)"
               vazio="Nenhum local encontrado."
-              invalido={invalido("local")}
+              limpavel
             />
           </div>
 
@@ -609,7 +605,7 @@ export function ItemForm({
               <ExcluirItem
                 id={item.id}
                 nome={item.nome}
-                endereco={locais.find((l) => l.id === item.local_id)?.endereco ?? ""}
+                endereco={locais.find((l) => l.id === item.local_id)?.endereco ?? null}
               />
             </div>
           )}

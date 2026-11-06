@@ -47,15 +47,25 @@ export async function carregarItem(
   return data;
 }
 
+export async function contarItensSemLocal(supabase: SupabaseClient): Promise<number> {
+  const { count, error } = await supabase
+    .from("itens")
+    .select("id", { count: "exact", head: true })
+    .is("local_id", null);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export async function listarItens(
   supabase: SupabaseClient,
-  filtro: { localIds: string[] | null; categoriaIds: string[] | null },
+  filtro: { localIds: string[] | null; semLocal: boolean; categoriaIds: string[] | null },
 ): Promise<ItemResumo[]> {
   return buscarTodos<ItemResumo>((de, ate) => {
     let consulta = supabase
       .from("itens")
       .select("id, nome, categoria_id, local_id, quantidade, unidade, situacao");
-    if (filtro.localIds) consulta = consulta.in("local_id", filtro.localIds);
+    if (filtro.semLocal) consulta = consulta.is("local_id", null);
+    else if (filtro.localIds) consulta = consulta.in("local_id", filtro.localIds);
     if (filtro.categoriaIds) consulta = consulta.in("categoria_id", filtro.categoriaIds);
     return consulta.order("id").range(de, ate);
   });

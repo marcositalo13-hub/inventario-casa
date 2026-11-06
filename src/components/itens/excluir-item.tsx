@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { excluirItem } from "@/app/(app)/itens/actions";
-import { EnderecoTag } from "@/components/endereco-tag";
+import { EnderecoTag, SemLocalTag } from "@/components/endereco-tag";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -24,7 +24,7 @@ export function ExcluirItem({
 }: {
   id: string;
   nome: string;
-  endereco: string;
+  endereco: string | null;
 }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
@@ -62,7 +62,7 @@ export function ExcluirItem({
           </AlertDialogHeader>
           <div className="flex flex-col items-start gap-2">
             <p className="font-medium">{nome}</p>
-            {endereco && <EnderecoTag endereco={endereco} />}
+            {endereco ? <EnderecoTag endereco={endereco} /> : <SemLocalTag />}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>

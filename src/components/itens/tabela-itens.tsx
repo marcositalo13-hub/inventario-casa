@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EnderecoTag } from "@/components/endereco-tag";
+import { EnderecoTag, SemLocalTag } from "@/components/endereco-tag";
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ export type LinhaItem = {
   id: string;
   nome: string;
   categoria: string;
-  endereco: string;
+  endereco: string | null;
   quantidade: string;
   situacao: string;
 };
@@ -56,7 +56,7 @@ export function TabelaItens({ linhas }: { linhas: LinhaItem[] }) {
               {l.categoria}
             </TableCell>
             <TableCell className="py-1">
-              <EnderecoTag endereco={l.endereco} />
+              {l.endereco === null ? <SemLocalTag /> : <EnderecoTag endereco={l.endereco} />}
             </TableCell>
             <TableCell className="py-1 text-right tabular-nums">{l.quantidade}</TableCell>
             <TableCell className="py-1 text-muted-foreground">{l.situacao}</TableCell>
