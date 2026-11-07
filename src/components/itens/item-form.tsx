@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +16,7 @@ import { criarItem, editarItem } from "@/app/(app)/itens/actions";
 import { Combobox } from "@/components/itens/combobox";
 import { ExcluirItem } from "@/components/itens/excluir-item";
 import { opcoesCategoria, opcoesLocal } from "@/components/itens/opcoes";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,6 +181,7 @@ export function ItemForm({
   pessoas,
   semLocal,
   item,
+  voltar = "/itens",
 }: {
   categorias: CategoriaRow[];
   locais: LocalRow[];
@@ -188,6 +190,8 @@ export function ItemForm({
   semLocal: number;
   /** Presente na edição. */
   item?: ItemRow;
+  /** Lista com os filtros de origem, já validada no servidor. */
+  voltar?: string;
 }) {
   const router = useRouter();
   const editando = item !== undefined;
@@ -299,7 +303,7 @@ export function ItemForm({
       });
       nomeRef.current?.focus();
     } else {
-      router.push("/itens");
+      router.push(voltar);
     }
   }
 
@@ -601,8 +605,14 @@ export function ItemForm({
             </Button>
           )}
           {editando && (
+            <Link href={voltar} className={buttonVariants({ variant: "ghost" })}>
+              Cancelar
+            </Link>
+          )}
+          {editando && (
             <div className="ml-auto">
               <ExcluirItem
+                voltar={voltar}
                 id={item.id}
                 nome={item.nome}
                 endereco={locais.find((l) => l.id === item.local_id)?.endereco ?? null}

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ItemForm } from "@/components/itens/item-form";
 import { UUID_REGEX } from "@/lib/itens";
+import { hrefVoltar } from "@/lib/itens-filtros";
 import {
   carregarCategorias,
   carregarItem,
@@ -11,8 +12,15 @@ import {
 import { carregarLocais } from "@/lib/locais-data";
 import { createClient } from "@/lib/supabase/server";
 
-async function Formulario({ params }: { params: PageProps<"/itens/[id]">["params"] }) {
+async function Formulario({
+  params,
+  searchParams,
+}: {
+  params: PageProps<"/itens/[id]">["params"];
+  searchParams: PageProps<"/itens/[id]">["searchParams"];
+}) {
   const { id } = await params;
+  const voltar = hrefVoltar((await searchParams).voltar);
   if (!UUID_REGEX.test(id)) notFound();
 
   const supabase = await createClient();
@@ -33,16 +41,17 @@ async function Formulario({ params }: { params: PageProps<"/itens/[id]">["params
       pessoas={pessoas}
       semLocal={semLocal}
       item={item}
+      voltar={voltar}
     />
   );
 }
 
-export default function EditarItemPage({ params }: PageProps<"/itens/[id]">) {
+export default function EditarItemPage({ params, searchParams }: PageProps<"/itens/[id]">) {
   return (
     <>
       <h1 className="text-3xl font-semibold">Editar item</h1>
       <Suspense fallback={<p className="mt-6 text-muted-foreground">Carregando…</p>}>
-        <Formulario params={params} />
+        <Formulario params={params} searchParams={searchParams} />
       </Suspense>
     </>
   );

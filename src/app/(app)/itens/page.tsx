@@ -29,6 +29,7 @@ import {
   hrefItens,
   hrefOrdenacao,
   lerFiltros,
+  paramsDosFiltros,
   semFiltros,
   temFiltroAtivo,
   tempoRelativo,
@@ -145,6 +146,8 @@ async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["sear
         id: i.id,
         nome: i.nome,
         categoria: cat ? rotuloCategoria(cat, categoriasPorId) : "",
+        categoriaNome: cat?.nome ?? "",
+        etiquetas: i.etiquetas ?? [],
         endereco: i.local_id ? (locaisPorId.get(i.local_id)?.endereco ?? null) : null,
         quantidade: formatQuantidade(i.quantidade, i.unidade),
         situacao: rotulo(SITUACOES, i.situacao),
@@ -202,8 +205,15 @@ async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["sear
         </p>
       ) : (
         <TabelaItens
+          // Nova chave a cada mudança de filtro ou ordenação: a seleção recomeça.
+          key={paramsDosFiltros(filtros).toString()}
           linhas={linhas}
           ordenacao={{ ordem: filtros.ordem, dir: filtros.dir, hrefs }}
+          voltar={paramsDosFiltros(filtros).toString()}
+          locais={locais}
+          categorias={categorias}
+          pessoas={pessoas}
+          etiquetas={etiquetas}
         />
       )}
     </div>
@@ -212,7 +222,7 @@ async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["sear
 
 export default function ItensPage({ searchParams }: PageProps<"/itens">) {
   return (
-    <>
+    <div data-largura="ampla">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-3">
           <h1 className="text-3xl font-semibold">Itens</h1>
@@ -228,6 +238,6 @@ export default function ItensPage({ searchParams }: PageProps<"/itens">) {
       <Suspense fallback={<p className="mt-6 text-muted-foreground">Carregando…</p>}>
         <Lista searchParams={searchParams} />
       </Suspense>
-    </>
+    </div>
   );
 }

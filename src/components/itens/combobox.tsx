@@ -33,6 +33,7 @@ export function Combobox({
   limpavel,
   triggerRef,
   className,
+  disabled,
 }: {
   id?: string;
   valor: string | null;
@@ -44,6 +45,7 @@ export function Combobox({
   limpavel?: boolean;
   triggerRef?: Ref<HTMLButtonElement>;
   className?: string;
+  disabled?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const buscaRef = useRef<HTMLInputElement>(null);
@@ -60,6 +62,7 @@ export function Combobox({
               type="button"
               variant="outline"
               role="combobox"
+              disabled={disabled}
               aria-expanded={aberto}
               aria-invalid={invalido || undefined}
               className="h-auto min-h-8 w-full min-w-0 justify-between gap-2 py-1 font-normal"

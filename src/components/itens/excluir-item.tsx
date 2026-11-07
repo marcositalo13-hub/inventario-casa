@@ -21,7 +21,10 @@ export function ExcluirItem({
   id,
   nome,
   endereco,
+  voltar,
 }: {
+  /** Para onde ir depois de excluir. */
+  voltar: string;
   id: string;
   nome: string;
   endereco: string | null;
@@ -39,7 +42,7 @@ export function ExcluirItem({
       }
       toast.success("Item excluído");
       setAberto(false);
-      router.push("/itens");
+      router.push(voltar);
     });
   }
 

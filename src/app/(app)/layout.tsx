@@ -44,7 +44,8 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </aside>
         <div className="ml-60 flex-1">
-          <main className="mx-auto max-w-[960px] px-8 pt-12 pb-12">
+          {/* 960px por padrão; uma página larga marca seu conteúdo com data-largura="ampla". */}
+          <main className="mx-auto max-w-[960px] px-8 pt-12 pb-12 has-data-[largura=ampla]:max-w-[1440px]">
             {children}
           </main>
         </div>

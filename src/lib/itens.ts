@@ -108,6 +108,9 @@ export function naturezaDaCategoria(
   return categoria.natureza_padrao ?? pai?.natureza_padrao ?? "duravel";
 }
 
+/** Máximo de itens por ação de edição em massa. */
+export const LIMITE_EM_MASSA = 500;
+
 /** Valor do filtro de local (?local=) para itens sem local. */
 export const SEM_LOCAL = "sem-local";
 

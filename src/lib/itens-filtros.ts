@@ -134,6 +134,22 @@ export function hrefItens(f: Filtros): string {
   return busca ? `/itens?${busca}` : "/itens";
 }
 
+/**
+ * Href de volta para a lista a partir do parâmetro "voltar" (a query string da
+ * lista). A query é relida como filtros e remontada, então o resultado é sempre
+ * /itens com parâmetros conhecidos: outros caminhos e URLs externas não passam.
+ */
+export function hrefVoltar(voltar: string | string[] | undefined): string {
+  const bruto = Array.isArray(voltar) ? voltar[0] : voltar;
+  if (!bruto || bruto.length > 4000) return "/itens";
+  const params: Params = {};
+  for (const [chave, valor] of new URLSearchParams(bruto)) {
+    const atual = params[chave];
+    params[chave] = atual === undefined ? valor : [...(Array.isArray(atual) ? atual : [atual]), valor];
+  }
+  return hrefItens(lerFiltros(params));
+}
+
 /** Algum filtro ativo (a ordenação não conta). */
 export function temFiltroAtivo(f: Filtros): boolean {
   return Boolean(

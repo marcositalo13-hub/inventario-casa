@@ -19,6 +19,7 @@ export type ItemResumo = Pick<
   | "marca"
   | "modelo"
   | "observacoes"
+  | "etiquetas"
 > & { created_at: string; updated_at: string };
 
 /** Filtros aplicados no banco; listas vazias e null não filtram. */
@@ -95,7 +96,7 @@ export async function listarItens(
     let consulta = supabase
       .from("itens")
       .select(
-        "id, nome, categoria_id, local_id, quantidade, unidade, situacao, marca, modelo, observacoes, created_at, updated_at",
+        "id, nome, categoria_id, local_id, quantidade, unidade, situacao, marca, modelo, observacoes, etiquetas, created_at, updated_at",
       );
     if (filtro.semLocal) consulta = consulta.is("local_id", null);
     else if (filtro.localIds) consulta = consulta.in("local_id", filtro.localIds);
