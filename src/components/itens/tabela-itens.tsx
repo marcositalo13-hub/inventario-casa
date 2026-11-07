@@ -1,7 +1,9 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { EnderecoTag, SemLocalTag } from "@/components/endereco-tag";
 import {
   Table,
@@ -11,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ColunaOrdem, Direcao } from "@/lib/itens-filtros";
+import { cn } from "@/lib/utils";
 
 export type LinhaItem = {
   id: string;
@@ -19,20 +23,94 @@ export type LinhaItem = {
   endereco: string | null;
   quantidade: string;
   situacao: string;
+  /** "há 2 dias" */
+  cadastrado: string;
+  /** Data e hora completas, para o title. */
+  cadastradoEm: string;
+  cadastradoIso: string;
+  /** "há 2 dias" */
+  atualizado: string;
+  /** Data e hora completas, para o title. */
+  atualizadoEm: string;
+  atualizadoIso: string;
 };
 
-export function TabelaItens({ linhas }: { linhas: LinhaItem[] }) {
+export type Ordenacao = {
+  ordem: ColunaOrdem;
+  dir: Direcao;
+  /** Href de cada cabeçalho (alterna a direção ou troca a coluna). */
+  hrefs: Record<ColunaOrdem, string>;
+};
+
+function CabecalhoOrdenavel({
+  coluna,
+  ordenacao,
+  className,
+  children,
+}: {
+  coluna: ColunaOrdem;
+  ordenacao: Ordenacao;
+  className?: string;
+  children: ReactNode;
+}) {
+  const ativo = ordenacao.ordem === coluna;
+  const Seta = !ativo ? ArrowUpDown : ordenacao.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead
+      aria-sort={ativo ? (ordenacao.dir === "asc" ? "ascending" : "descending") : undefined}
+      className={className}
+    >
+      <Link
+        href={ordenacao.hrefs[coluna]}
+        scroll={false}
+        className={cn(
+          "group inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+          ativo ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {children}
+        <Seta
+          aria-hidden
+          size={14}
+          className={cn(!ativo && "opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60")}
+        />
+      </Link>
+    </TableHead>
+  );
+}
+
+export function TabelaItens({
+  linhas,
+  ordenacao,
+}: {
+  linhas: LinhaItem[];
+  ordenacao: Ordenacao;
+}) {
   const router = useRouter();
 
   return (
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead>Nome</TableHead>
-          <TableHead>Categoria</TableHead>
-          <TableHead>Endereço</TableHead>
-          <TableHead className="text-right">Qtd</TableHead>
+          <CabecalhoOrdenavel coluna="nome" ordenacao={ordenacao}>
+            Nome
+          </CabecalhoOrdenavel>
+          <CabecalhoOrdenavel coluna="categoria" ordenacao={ordenacao}>
+            Categoria
+          </CabecalhoOrdenavel>
+          <CabecalhoOrdenavel coluna="endereco" ordenacao={ordenacao}>
+            Endereço
+          </CabecalhoOrdenavel>
+          <CabecalhoOrdenavel coluna="qtd" ordenacao={ordenacao} className="text-right">
+            Qtd
+          </CabecalhoOrdenavel>
           <TableHead>Situação</TableHead>
+          <CabecalhoOrdenavel coluna="cadastrado" ordenacao={ordenacao}>
+            Cadastrado
+          </CabecalhoOrdenavel>
+          <CabecalhoOrdenavel coluna="atualizado" ordenacao={ordenacao}>
+            Atualizado
+          </CabecalhoOrdenavel>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -60,6 +138,14 @@ export function TabelaItens({ linhas }: { linhas: LinhaItem[] }) {
             </TableCell>
             <TableCell className="py-1 text-right tabular-nums">{l.quantidade}</TableCell>
             <TableCell className="py-1 text-muted-foreground">{l.situacao}</TableCell>
+            <TableCell className="py-1 whitespace-nowrap text-muted-foreground">
+              <time dateTime={l.cadastradoIso} title={l.cadastradoEm}>
+                {l.cadastrado}
+              </time>
+            </TableCell>
+            <TableCell className="py-1 whitespace-nowrap text-muted-foreground">
+              <time dateTime={l.atualizadoIso} title={l.atualizadoEm}>{l.atualizado}</time>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

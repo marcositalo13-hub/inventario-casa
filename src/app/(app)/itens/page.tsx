@@ -1,10 +1,18 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
-import { FiltrosItens, type Filtros } from "@/components/itens/filtros-itens";
+import { io } from "next/cache";
+import { Plus, X } from "lucide-react";
+import { FiltrosItens } from "@/components/itens/filtros-itens";
 import { TabelaItens, type LinhaItem } from "@/components/itens/tabela-itens";
 import { buttonVariants } from "@/components/ui/button";
-import { carregarCategorias, contarItensSemLocal, listarItens } from "@/lib/itens-data";
+import {
+  carregarCategorias,
+  carregarEtiquetas,
+  carregarPessoas,
+  contarItensSemLocal,
+  listarItens,
+  type ItemResumo,
+} from "@/lib/itens-data";
 import {
   SEM_LOCAL,
   SITUACOES,
@@ -14,14 +22,22 @@ import {
   rotulo,
   rotuloCategoria,
 } from "@/lib/itens";
+import {
+  COLUNAS_ORDEM,
+  FILTROS_VAZIOS,
+  formatDataHora,
+  hrefItens,
+  hrefOrdenacao,
+  lerFiltros,
+  semFiltros,
+  temFiltroAtivo,
+  tempoRelativo,
+  type ColunaOrdem,
+  type Filtros,
+} from "@/lib/itens-filtros";
 import { carregarLocais } from "@/lib/locais-data";
 import { idsComDescendentes } from "@/lib/locais";
 import { createClient } from "@/lib/supabase/server";
-
-function primeiro(valor: string | string[] | undefined): string | null {
-  const v = Array.isArray(valor) ? valor[0] : valor;
-  return v && v.trim() ? v.trim() : null;
-}
 
 /** Link que aplica o filtro "Sem local", mantendo a busca e a categoria. */
 async function LinkSemLocal({
@@ -29,19 +45,18 @@ async function LinkSemLocal({
 }: {
   searchParams: PageProps<"/itens">["searchParams"];
 }) {
-  const params = await searchParams;
+  const filtros = lerFiltros(await searchParams);
   const total = await contarItensSemLocal(await createClient());
   if (total === 0) return null;
 
-  const busca = new URLSearchParams({ local: SEM_LOCAL });
-  const q = primeiro(params.q);
-  const categoria = primeiro(params.categoria);
-  if (q) busca.set("q", q);
-  if (categoria) busca.set("categoria", categoria);
-
   return (
     <Link
-      href={`/itens?${busca}`}
+      href={hrefItens({
+        ...FILTROS_VAZIOS,
+        q: filtros.q,
+        categoria: filtros.categoria,
+        local: SEM_LOCAL,
+      })}
       className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
     >
       {total} {total === 1 ? "item" : "itens"} sem local
@@ -49,70 +64,147 @@ async function LinkSemLocal({
   );
 }
 
+type LinhaOrdenavel = { item: ItemResumo; linha: LinhaItem };
+
+/** Instante da requisição, fora do shell estático. */
+async function agoraNaRequisicao(): Promise<number> {
+  await io();
+  return Date.now();
+}
+
+const textoBR = (a: string, b: string) => a.localeCompare(b, "pt-BR");
+
+function comparar(coluna: ColunaOrdem, a: LinhaOrdenavel, b: LinhaOrdenavel): number {
+  switch (coluna) {
+    case "nome":
+      return textoBR(a.linha.nome, b.linha.nome);
+    case "categoria":
+      return textoBR(a.linha.categoria, b.linha.categoria);
+    case "endereco":
+      // Sem local ("") vem primeiro na ordem crescente.
+      return textoBR(a.linha.endereco ?? "", b.linha.endereco ?? "");
+    case "qtd":
+      return a.item.quantidade - b.item.quantidade || textoBR(a.item.unidade, b.item.unidade);
+    case "cadastrado":
+      return Date.parse(a.item.created_at) - Date.parse(b.item.created_at);
+    case "atualizado":
+      return Date.parse(a.item.updated_at) - Date.parse(b.item.updated_at);
+  }
+}
+
 async function Lista({ searchParams }: { searchParams: PageProps<"/itens">["searchParams"] }) {
-  const params = await searchParams;
+  const pedidos = lerFiltros(await searchParams);
   const supabase = await createClient();
-  const [{ locais }, categorias] = await Promise.all([
+  const [{ locais }, categorias, pessoas, etiquetas] = await Promise.all([
     carregarLocais(supabase),
     carregarCategorias(supabase),
+    carregarPessoas(supabase),
+    carregarEtiquetas(supabase),
   ]);
 
-  const semLocal = primeiro(params.local) === SEM_LOCAL;
-  const local = locais.find((l) => l.id === primeiro(params.local));
-  const categoria = categorias.find((c) => c.id === primeiro(params.categoria));
+  // Ids que não existem (mais) são ignorados.
+  const local = locais.find((l) => l.id === pedidos.local);
+  const categoria = categorias.find((c) => c.id === pedidos.categoria);
   const filtros: Filtros = {
-    q: primeiro(params.q) ?? "",
-    local: semLocal ? SEM_LOCAL : (local?.id ?? null),
+    ...pedidos,
+    local: pedidos.local === SEM_LOCAL ? SEM_LOCAL : (local?.id ?? null),
     categoria: categoria?.id ?? null,
+    pessoa: pessoas.some((p) => p.id === pedidos.pessoa) ? pedidos.pessoa : null,
   };
 
   const itens = await listarItens(supabase, {
     localIds: local ? idsComDescendentes(local.id, locais) : null,
-    semLocal,
+    semLocal: filtros.local === SEM_LOCAL,
     categoriaIds: categoria ? idsCategoriaComSubs(categoria.id, categorias) : null,
+    situacoes: filtros.situacao,
+    frequencias: filtros.frequencia,
+    estados: filtros.estado,
+    etiquetas: filtros.etiquetas,
+    pessoaId: filtros.pessoa,
+    natureza: filtros.natureza,
+    incompletos: filtros.incompletos,
   });
 
   // Busca sem distinção de acentos e maiúsculas: o banco não tem a extensão
-  // unaccent, então o filtro por nome é aplicado aqui.
-  const filtrados = filtros.q ? itens.filter((i) => corresponde(filtros.q, i.nome)) : itens;
+  // unaccent, então o texto é filtrado aqui, depois da consulta.
+  const filtrados = filtros.q
+    ? itens.filter((i) =>
+        corresponde(filtros.q, i.nome, i.marca ?? "", i.modelo ?? "", i.observacoes ?? ""),
+      )
+    : itens;
+
+  const agora = await agoraNaRequisicao();
 
   const locaisPorId = new Map(locais.map((l) => [l.id, l]));
   const categoriasPorId = new Map(categorias.map((c) => [c.id, c]));
+  const sinal = filtros.dir === "asc" ? 1 : -1;
   const linhas: LinhaItem[] = filtrados
-    .map((i) => {
+    .map((i): LinhaOrdenavel => {
       const cat = categoriasPorId.get(i.categoria_id);
-      return {
+      const linha: LinhaItem = {
         id: i.id,
         nome: i.nome,
         categoria: cat ? rotuloCategoria(cat, categoriasPorId) : "",
         endereco: i.local_id ? (locaisPorId.get(i.local_id)?.endereco ?? null) : null,
         quantidade: formatQuantidade(i.quantidade, i.unidade),
         situacao: rotulo(SITUACOES, i.situacao),
+        cadastrado: tempoRelativo(i.created_at, agora),
+        cadastradoEm: formatDataHora(i.created_at),
+        cadastradoIso: i.created_at,
+        atualizado: tempoRelativo(i.updated_at, agora),
+        atualizadoEm: formatDataHora(i.updated_at),
+        atualizadoIso: i.updated_at,
       };
+      return { item: i, linha };
     })
     .sort(
       (a, b) =>
-        // Sem local ("") vem primeiro.
-        (a.endereco ?? "").localeCompare(b.endereco ?? "", "pt-BR") ||
-        a.nome.localeCompare(b.nome, "pt-BR"),
-    );
+        sinal * comparar(filtros.ordem, a, b) ||
+        textoBR(a.linha.nome, b.linha.nome) ||
+        textoBR(a.item.id, b.item.id),
+    )
+    .map(({ linha }) => linha);
 
-  const temFiltro = Boolean(filtros.q || filtros.local || filtros.categoria);
+  const temFiltro = temFiltroAtivo(filtros);
+  const hrefs = Object.fromEntries(
+    COLUNAS_ORDEM.map((c) => [c, hrefOrdenacao(filtros, c)]),
+  ) as Record<ColunaOrdem, string>;
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <FiltrosItens filtros={filtros} locais={locais} categorias={categorias} />
-      {linhas.length === 0 ? (
-        <p className="text-muted-foreground">
-          {temFiltro ? "Nenhum item encontrado com esses filtros." : "Nenhum item cadastrado."}
-        </p>
-      ) : (
-        <>
-          <TabelaItens linhas={linhas} />
-          <p className="text-sm text-muted-foreground">
+      <FiltrosItens
+        filtros={filtros}
+        locais={locais}
+        categorias={categorias}
+        pessoas={pessoas}
+        etiquetas={etiquetas}
+      />
+      {(linhas.length > 0 || temFiltro) && (
+        <div className="flex min-h-7 items-center gap-3 text-sm">
+          <p className="text-muted-foreground" aria-live="polite">
             {linhas.length} {linhas.length === 1 ? "item" : "itens"}
           </p>
-        </>
+          {temFiltro && (
+            <Link
+              href={hrefItens(semFiltros(filtros))}
+              scroll={false}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              <X aria-hidden />
+              Limpar filtros
+            </Link>
+          )}
+        </div>
+      )}
+      {linhas.length === 0 ? (
+        <p className="text-muted-foreground">
+          {temFiltro ? "Nenhum item corresponde aos filtros." : "Nenhum item cadastrado."}
+        </p>
+      ) : (
+        <TabelaItens
+          linhas={linhas}
+          ordenacao={{ ordem: filtros.ordem, dir: filtros.dir, hrefs }}
+        />
       )}
     </div>
   );
