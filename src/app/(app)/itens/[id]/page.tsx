@@ -48,11 +48,11 @@ async function Formulario({
 
 export default function EditarItemPage({ params, searchParams }: PageProps<"/itens/[id]">) {
   return (
-    <>
+    <div data-largura="ampla">
       <h1 className="text-3xl font-semibold">Editar item</h1>
       <Suspense fallback={<p className="mt-6 text-muted-foreground">Carregando…</p>}>
         <Formulario params={params} searchParams={searchParams} />
       </Suspense>
-    </>
+    </div>
   );
 }

@@ -16,6 +16,7 @@ import { criarItem, editarItem } from "@/app/(app)/itens/actions";
 import { Combobox } from "@/components/itens/combobox";
 import { ExcluirItem } from "@/components/itens/excluir-item";
 import { opcoesCategoria, opcoesLocal } from "@/components/itens/opcoes";
+import { PainelLocal } from "@/components/itens/painel-local";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -208,6 +209,10 @@ export function ItemForm({
   const [erro, setErro] = useState<{ campo: CampoObrigatorio; mensagem: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const detalhesAberto = useDetalhesAberto();
+  // Painel lateral: opção destacada na lista de locais aberta e foco em
+  // nome/categoria.
+  const [previaLocal, setPreviaLocal] = useState<string | null>(null);
+  const [editandoTexto, setEditandoTexto] = useState(false);
 
   const nomeRef = useRef<HTMLInputElement>(null);
   const categoriaRef = useRef<HTMLButtonElement>(null);
@@ -322,305 +327,328 @@ export function ItemForm({
 
   const invalido = (campo: CampoObrigatorio) => erro?.campo === campo || undefined;
 
+  const focoTexto = {
+    onFocus: () => setEditandoTexto(true),
+    onBlur: () => setEditandoTexto(false),
+  };
+
   return (
-    <div className="mt-6 flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground" aria-live="polite">
-        {local
-          ? `${local.itens} ${local.itens === 1 ? "item" : "itens"} neste local`
-          : `${semLocal} ${semLocal === 1 ? "item" : "itens"} sem local`}
-      </p>
+    <div className="mt-6 grid gap-8 min-[1100px]:grid-cols-[minmax(0,640px)_360px]">
+      <div className="flex min-w-0 max-w-[640px] flex-col gap-4">
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {local
+            ? `${local.itens} ${local.itens === 1 ? "item" : "itens"} neste local`
+            : `${semLocal} ${semLocal === 1 ? "item" : "itens"} sem local`}
+        </p>
 
-      <form
-        onSubmit={aoEnviar}
-        onKeyDown={aoTeclar}
-        noValidate
-        className="flex flex-col gap-6"
-      >
-        {/* Obrigatórios */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="item-nome">Nome</Label>
-            <Input
-              ref={nomeRef}
-              id="item-nome"
-              autoFocus
-              autoComplete="off"
-              value={campos.nome}
-              aria-invalid={invalido("nome")}
-              onChange={(e) => set("nome", e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="item-categoria">Categoria</Label>
-            <Combobox
-              id="item-categoria"
-              triggerRef={categoriaRef}
-              valor={campos.categoriaId}
-              opcoes={opcoesCat}
-              onChange={escolherCategoria}
-              placeholder="Escolha a categoria"
-              vazio="Nenhuma categoria encontrada."
-              invalido={invalido("categoria")}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="item-local">Local</Label>
-            <Combobox
-              id="item-local"
-              valor={campos.localId}
-              opcoes={opcoesLoc}
-              onChange={(id) => set("localId", id)}
-              placeholder="Sem local (definir depois)"
-              vazio="Nenhum local encontrado."
-              limpavel
-            />
-          </div>
-
-          <div className="flex gap-3">
+        <form
+          onSubmit={aoEnviar}
+          onKeyDown={aoTeclar}
+          noValidate
+          className="flex flex-col gap-6"
+        >
+          {/* Obrigatórios */}
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="item-quantidade">Quantidade</Label>
+              <Label htmlFor="item-nome">Nome</Label>
               <Input
-                ref={quantidadeRef}
-                id="item-quantidade"
-                inputMode="decimal"
+                ref={nomeRef}
+                id="item-nome"
+                autoFocus
                 autoComplete="off"
-                value={campos.quantidade}
-                aria-invalid={invalido("quantidade")}
-                onChange={(e) => set("quantidade", e.target.value)}
-                className="w-32"
+                value={campos.nome}
+                aria-invalid={invalido("nome")}
+                onChange={(e) => set("nome", e.target.value)}
+                {...focoTexto}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="item-unidade">Unidade</Label>
-              <Input
-                ref={unidadeRef}
-                id="item-unidade"
-                autoComplete="off"
-                value={campos.unidade}
-                aria-invalid={invalido("unidade")}
-                onChange={(e) => set("unidade", e.target.value)}
-                className="w-32"
+
+            {/* Os eventos de foco do React atravessam o portal da lista. */}
+            <div className="flex flex-col gap-2" {...focoTexto}>
+              <Label htmlFor="item-categoria">Categoria</Label>
+              <Combobox
+                id="item-categoria"
+                triggerRef={categoriaRef}
+                valor={campos.categoriaId}
+                opcoes={opcoesCat}
+                onChange={escolherCategoria}
+                placeholder="Escolha a categoria"
+                vazio="Nenhuma categoria encontrada."
+                invalido={invalido("categoria")}
               />
             </div>
-          </div>
-        </div>
 
-        {/* Detalhes */}
-        <section className="flex flex-col gap-4">
-          <button
-            type="button"
-            aria-expanded={detalhesAberto}
-            aria-controls="item-detalhes"
-            onClick={() => gravarDetalhes(!detalhesAberto)}
-            className="-ml-1 flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm font-semibold hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ChevronRight
-              size={16}
-              aria-hidden
-              className={cn("text-muted-foreground", detalhesAberto && "rotate-90")}
-            />
-            Detalhes
-          </button>
-
-          {detalhesAberto && (
-            <div id="item-detalhes" className="grid gap-4 sm:grid-cols-2">
-              <CampoTexto
-                id="item-marca"
-                rotulo="Marca"
-                valor={campos.marca}
-                onChange={(v) => set("marca", v)}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="item-local">Local</Label>
+              <Combobox
+                id="item-local"
+                valor={campos.localId}
+                opcoes={opcoesLoc}
+                onChange={(id) => set("localId", id)}
+                placeholder="Sem local (definir depois)"
+                vazio="Nenhum local encontrado."
+                limpavel
+                onDestaque={setPreviaLocal}
               />
-              <CampoTexto
-                id="item-modelo"
-                rotulo="Modelo"
-                valor={campos.modelo}
-                onChange={(v) => set("modelo", v)}
-              />
+            </div>
 
+            <div className="flex gap-3">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="item-pessoa">Pessoa</Label>
-                {pessoas.length === 0 ? (
-                  <Select disabled value={null}>
-                    <SelectTrigger id="item-pessoa" className="w-full">
-                      <SelectValue placeholder="Nenhuma pessoa cadastrada" />
-                    </SelectTrigger>
-                  </Select>
-                ) : (
-                  <CampoSelect
-                    id="item-pessoa"
-                    valor={campos.pessoaId}
-                    itens={[NENHUM, ...pessoas.map((p) => ({ value: p.id, label: p.nome }))]}
-                    onChange={(v) => set("pessoaId", v)}
-                  />
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="item-frequencia">Frequência de uso</Label>
-                <CampoSelect
-                  id="item-frequencia"
-                  valor={campos.frequenciaUso}
-                  itens={[NENHUM, ...FREQUENCIAS]}
-                  onChange={(v) => set("frequenciaUso", v)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="item-estado">Estado</Label>
-                <CampoSelect
-                  id="item-estado"
-                  valor={campos.estado}
-                  itens={[NENHUM, ...ESTADOS]}
-                  onChange={(v) => set("estado", v)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="item-situacao">Situação</Label>
-                <CampoSelect
-                  id="item-situacao"
-                  valor={campos.situacao}
-                  itens={SITUACOES}
-                  onChange={(v) => {
-                    if (!v) return;
-                    set("situacao", v as Situacao);
-                    if (v === "emprestado") {
-                      requestAnimationFrame(() => emprestadoRef.current?.focus());
-                    }
-                  }}
-                />
-              </div>
-
-              {campos.situacao === "emprestado" && (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="item-emprestado">Emprestado para</Label>
-                  <Input
-                    ref={emprestadoRef}
-                    id="item-emprestado"
-                    autoComplete="off"
-                    value={campos.emprestadoPara}
-                    aria-invalid={invalido("emprestadoPara")}
-                    onChange={(e) => set("emprestadoPara", e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="item-natureza">Natureza</Label>
-                <CampoSelect
-                  id="item-natureza"
-                  valor={campos.natureza}
-                  itens={NATUREZAS}
-                  onChange={(v) => v && set("natureza", v as Natureza)}
-                />
-              </div>
-
-              <CampoTexto
-                id="item-aquisicao"
-                rotulo="Data de aquisição"
-                type="date"
-                valor={campos.dataAquisicao}
-                onChange={(v) => set("dataAquisicao", v)}
-              />
-              <CampoTexto
-                id="item-garantia"
-                rotulo="Garantia até"
-                type="date"
-                valor={campos.garantiaAte}
-                onChange={(v) => set("garantiaAte", v)}
-              />
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="item-valor">Valor pago</Label>
+                <Label htmlFor="item-quantidade">Quantidade</Label>
                 <Input
-                  id="item-valor"
+                  ref={quantidadeRef}
+                  id="item-quantidade"
                   inputMode="decimal"
                   autoComplete="off"
-                  placeholder="0,00"
-                  value={campos.valorPago}
-                  onChange={(e) => set("valorPago", e.target.value)}
-                  onBlur={() => {
-                    const n = parseDecimalBR(campos.valorPago);
-                    if (n.ok && n.numero != null) set("valorPago", formatMoedaBR(n.numero));
-                  }}
+                  value={campos.quantidade}
+                  aria-invalid={invalido("quantidade")}
+                  onChange={(e) => set("quantidade", e.target.value)}
+                  className="w-32"
                 />
               </div>
-
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="item-etiquetas">Etiquetas</Label>
-                <Etiquetas
-                  id="item-etiquetas"
-                  valores={campos.etiquetas}
-                  onChange={(v) => set("etiquetas", v)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="item-observacoes">Observações</Label>
-                <Textarea
-                  id="item-observacoes"
-                  value={campos.observacoes}
-                  onChange={(e) => set("observacoes", e.target.value)}
-                  rows={3}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="item-unidade">Unidade</Label>
+                <Input
+                  ref={unidadeRef}
+                  id="item-unidade"
+                  autoComplete="off"
+                  value={campos.unidade}
+                  aria-invalid={invalido("unidade")}
+                  onChange={(e) => set("unidade", e.target.value)}
+                  className="w-32"
                 />
               </div>
             </div>
-          )}
-        </section>
+          </div>
 
-        {/* Atributos da categoria */}
-        {schema.length > 0 && (
+          {/* Detalhes */}
           <section className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold">Atributos da categoria</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {schema.map((def) => (
-                <CampoAtributo
-                  key={def.chave}
-                  def={def}
-                  valor={campos.atributos[def.chave]}
-                  onChange={(v) => setAtributo(def.chave, v)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {erro && (
-          <p role="alert" className="text-sm text-destructive">
-            {erro.mensagem}
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-          {/* "Salvar" vem primeiro no DOM para ser o botão acionado pelo Enter. */}
-          <Button type="submit" name="salvar" disabled={salvando}>
-            Salvar
-          </Button>
-          {!editando && (
-            <Button type="submit" name="outro" variant="outline" disabled={salvando}>
-              Salvar e cadastrar outro
-              <kbd className="ml-1 font-sans text-xs text-muted-foreground">Ctrl+Enter</kbd>
-            </Button>
-          )}
-          {editando && (
-            <Link href={voltar} className={buttonVariants({ variant: "ghost" })}>
-              Cancelar
-            </Link>
-          )}
-          {editando && (
-            <div className="ml-auto">
-              <ExcluirItem
-                voltar={voltar}
-                id={item.id}
-                nome={item.nome}
-                endereco={locais.find((l) => l.id === item.local_id)?.endereco ?? null}
+            <button
+              type="button"
+              aria-expanded={detalhesAberto}
+              aria-controls="item-detalhes"
+              onClick={() => gravarDetalhes(!detalhesAberto)}
+              className="-ml-1 flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm font-semibold hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <ChevronRight
+                size={16}
+                aria-hidden
+                className={cn("text-muted-foreground", detalhesAberto && "rotate-90")}
               />
-            </div>
+              Detalhes
+            </button>
+
+            {detalhesAberto && (
+              <div id="item-detalhes" className="grid gap-4 sm:grid-cols-2">
+                <CampoTexto
+                  id="item-marca"
+                  rotulo="Marca"
+                  valor={campos.marca}
+                  onChange={(v) => set("marca", v)}
+                />
+                <CampoTexto
+                  id="item-modelo"
+                  rotulo="Modelo"
+                  valor={campos.modelo}
+                  onChange={(v) => set("modelo", v)}
+                />
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-pessoa">Pessoa</Label>
+                  {pessoas.length === 0 ? (
+                    <Select disabled value={null}>
+                      <SelectTrigger id="item-pessoa" className="w-full">
+                        <SelectValue placeholder="Nenhuma pessoa cadastrada" />
+                      </SelectTrigger>
+                    </Select>
+                  ) : (
+                    <CampoSelect
+                      id="item-pessoa"
+                      valor={campos.pessoaId}
+                      itens={[NENHUM, ...pessoas.map((p) => ({ value: p.id, label: p.nome }))]}
+                      onChange={(v) => set("pessoaId", v)}
+                    />
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-frequencia">Frequência de uso</Label>
+                  <CampoSelect
+                    id="item-frequencia"
+                    valor={campos.frequenciaUso}
+                    itens={[NENHUM, ...FREQUENCIAS]}
+                    onChange={(v) => set("frequenciaUso", v)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-estado">Estado</Label>
+                  <CampoSelect
+                    id="item-estado"
+                    valor={campos.estado}
+                    itens={[NENHUM, ...ESTADOS]}
+                    onChange={(v) => set("estado", v)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-situacao">Situação</Label>
+                  <CampoSelect
+                    id="item-situacao"
+                    valor={campos.situacao}
+                    itens={SITUACOES}
+                    onChange={(v) => {
+                      if (!v) return;
+                      set("situacao", v as Situacao);
+                      if (v === "emprestado") {
+                        requestAnimationFrame(() => emprestadoRef.current?.focus());
+                      }
+                    }}
+                  />
+                </div>
+
+                {campos.situacao === "emprestado" && (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="item-emprestado">Emprestado para</Label>
+                    <Input
+                      ref={emprestadoRef}
+                      id="item-emprestado"
+                      autoComplete="off"
+                      value={campos.emprestadoPara}
+                      aria-invalid={invalido("emprestadoPara")}
+                      onChange={(e) => set("emprestadoPara", e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-natureza">Natureza</Label>
+                  <CampoSelect
+                    id="item-natureza"
+                    valor={campos.natureza}
+                    itens={NATUREZAS}
+                    onChange={(v) => v && set("natureza", v as Natureza)}
+                  />
+                </div>
+
+                <CampoTexto
+                  id="item-aquisicao"
+                  rotulo="Data de aquisição"
+                  type="date"
+                  valor={campos.dataAquisicao}
+                  onChange={(v) => set("dataAquisicao", v)}
+                />
+                <CampoTexto
+                  id="item-garantia"
+                  rotulo="Garantia até"
+                  type="date"
+                  valor={campos.garantiaAte}
+                  onChange={(v) => set("garantiaAte", v)}
+                />
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="item-valor">Valor pago</Label>
+                  <Input
+                    id="item-valor"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0,00"
+                    value={campos.valorPago}
+                    onChange={(e) => set("valorPago", e.target.value)}
+                    onBlur={() => {
+                      const n = parseDecimalBR(campos.valorPago);
+                      if (n.ok && n.numero != null) set("valorPago", formatMoedaBR(n.numero));
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label htmlFor="item-etiquetas">Etiquetas</Label>
+                  <Etiquetas
+                    id="item-etiquetas"
+                    valores={campos.etiquetas}
+                    onChange={(v) => set("etiquetas", v)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label htmlFor="item-observacoes">Observações</Label>
+                  <Textarea
+                    id="item-observacoes"
+                    value={campos.observacoes}
+                    onChange={(e) => set("observacoes", e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Atributos da categoria */}
+          {schema.length > 0 && (
+            <section className="flex flex-col gap-4">
+              <h2 className="text-sm font-semibold">Atributos da categoria</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {schema.map((def) => (
+                  <CampoAtributo
+                    key={def.chave}
+                    def={def}
+                    valor={campos.atributos[def.chave]}
+                    onChange={(v) => setAtributo(def.chave, v)}
+                  />
+                ))}
+              </div>
+            </section>
           )}
-        </div>
-      </form>
+
+          {erro && (
+            <p role="alert" className="text-sm text-destructive">
+              {erro.mensagem}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+            {/* "Salvar" vem primeiro no DOM para ser o botão acionado pelo Enter. */}
+            <Button type="submit" name="salvar" disabled={salvando}>
+              Salvar
+            </Button>
+            {!editando && (
+              <Button type="submit" name="outro" variant="outline" disabled={salvando}>
+                Salvar e cadastrar outro
+                <kbd className="ml-1 font-sans text-xs text-muted-foreground">Ctrl+Enter</kbd>
+              </Button>
+            )}
+            {editando && (
+              <Link href={voltar} className={buttonVariants({ variant: "ghost" })}>
+                Cancelar
+              </Link>
+            )}
+            {editando && (
+              <div className="ml-auto">
+                <ExcluirItem
+                  voltar={voltar}
+                  id={item.id}
+                  nome={item.nome}
+                  endereco={locais.find((l) => l.id === item.local_id)?.endereco ?? null}
+                />
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
+      <PainelLocal
+        // Depois de salvar, a página recarrega as contagens dos locais: o painel
+        // recomeça com o cache vazio.
+        key={`${semLocal}:${locais.map((l) => l.itens).join(",")}`}
+        nome={campos.nome}
+        categoriaId={campos.categoriaId}
+        localId={campos.localId}
+        previaLocalId={previaLocal}
+        editandoNomeOuCategoria={editandoTexto}
+        excluirItemId={item?.id ?? null}
+        locais={locais}
+        onEscolherLocal={(id) => set("localId", id)}
+      />
     </div>
   );
 }

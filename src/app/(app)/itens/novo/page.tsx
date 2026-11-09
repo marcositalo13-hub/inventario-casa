@@ -21,11 +21,11 @@ async function Formulario() {
 
 export default function NovoItemPage() {
   return (
-    <>
+    <div data-largura="ampla">
       <h1 className="text-3xl font-semibold">Novo item</h1>
       <Suspense fallback={<p className="mt-6 text-muted-foreground">Carregando…</p>}>
         <Formulario />
       </Suspense>
-    </>
+    </div>
   );
 }

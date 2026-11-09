@@ -34,6 +34,7 @@ export function Combobox({
   triggerRef,
   className,
   disabled,
+  onDestaque,
 }: {
   id?: string;
   valor: string | null;
@@ -46,14 +47,40 @@ export function Combobox({
   triggerRef?: Ref<HTMLButtonElement>;
   className?: string;
   disabled?: boolean;
+  /**
+   * Opção destacada (teclado ou mouse) enquanto a lista está aberta; null ao
+   * fechar ou quando a busca não encontra nada. Com ela, a lista abre com a
+   * opção atual destacada.
+   */
+  onDestaque?: (id: string | null) => void;
 }) {
   const [aberto, setAberto] = useState(false);
+  const [destaque, setDestaque] = useState("");
   const buscaRef = useRef<HTMLInputElement>(null);
   const atual = opcoes.find((o) => o.id === valor);
 
+  function abrirOuFechar(abrir: boolean) {
+    setAberto(abrir);
+    if (!onDestaque) return;
+    setDestaque(abrir ? (valor ?? "") : "");
+    onDestaque(abrir ? valor : null);
+  }
+
+  // Controla o destaque do cmdk só quando alguém escuta (onValueChange só é
+  // chamado no modo controlado).
+  const controleDestaque = onDestaque
+    ? {
+        value: destaque,
+        onValueChange: (id: string) => {
+          setDestaque(id);
+          onDestaque(id || null);
+        },
+      }
+    : {};
+
   return (
     <div className={cn("flex min-w-0 items-center gap-1", className)}>
-      <Popover open={aberto} onOpenChange={setAberto}>
+      <Popover open={aberto} onOpenChange={abrirOuFechar}>
         <PopoverTrigger
           render={
             <Button
@@ -84,6 +111,7 @@ export function Combobox({
           className="w-(--anchor-width) min-w-80 p-0"
         >
           <Command
+            {...controleDestaque}
             filter={(_valor, busca, palavras) =>
               corresponde(busca, ...(palavras ?? [])) ? 1 : 0
             }
@@ -99,7 +127,7 @@ export function Combobox({
                   data-checked={o.id === valor}
                   onSelect={() => {
                     onChange(o.id);
-                    setAberto(false);
+                    abrirOuFechar(false);
                   }}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
