@@ -7,7 +7,6 @@ import {
   sugerirLocais,
 } from "@/app/(app)/itens/painel-actions";
 import { EnderecoTag } from "@/components/endereco-tag";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   MIN_BUSCA,
@@ -181,11 +180,7 @@ export function PainelLocal({
   return (
     <aside
       aria-label="Ajuda para escolher o local"
-      className={cn(
-        "border-t border-border bg-sidebar p-4 text-sm",
-        "min-[1100px]:sticky min-[1100px]:top-6 min-[1100px]:max-h-[calc(100vh-3rem)] min-[1100px]:self-start min-[1100px]:overflow-y-auto min-[1100px]:border-t-0 min-[1100px]:border-l",
-        className,
-      )}
+      className={cn("bg-sidebar p-4 text-sm", className)}
     >
       <div className="mb-4 flex flex-col gap-2 border-b border-border pb-4">
         <label htmlFor="painel-busca" className="font-semibold">
@@ -220,6 +215,8 @@ export function PainelLocal({
         <Conteudo
           endereco={locais.find((l) => l.id === localConteudo)?.endereco ?? ""}
           consulta={conteudo}
+          localId={localId}
+          onEscolher={onEscolherLocal}
         />
       )}
     </aside>
@@ -230,6 +227,56 @@ type Consulta<T> = ReturnType<typeof useConsulta<T>>;
 
 function Estado({ children }: { children: React.ReactNode }) {
   return <p className="text-muted-foreground">{children}</p>;
+}
+
+/**
+ * Linha inteira clicável (e acionável por teclado) que escolhe um local, com a
+ * dica "usar" no hover/foco. O clique não tira o foco do campo em edição.
+ */
+function LinhaUsar({
+  ativo,
+  rotulo,
+  onUsar,
+  children,
+}: {
+  /** O local desta linha é o escolhido no formulário. */
+  ativo: boolean;
+  /** Nome acessível da ação. */
+  rotulo: string;
+  onUsar: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={rotulo}
+      aria-pressed={ativo}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onUsar}
+      className={cn(
+        "group flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        ativo && "bg-surface-hover",
+      )}
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-1">{children}</span>
+      <span
+        aria-hidden
+        className="shrink-0 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+      >
+        usar
+      </span>
+    </button>
+  );
+}
+
+/** EnderecoTag + caminho, que quebra linha em vez de cortar. */
+function LinhaEndereco({ endereco, caminho }: { endereco: string; caminho: string }) {
+  return (
+    <span className="flex min-w-0 items-start gap-2">
+      <EnderecoTag endereco={endereco} className="shrink-0" />
+      <span className="min-w-0 pt-0.5 break-words text-muted-foreground">{caminho}</span>
+    </span>
+  );
 }
 
 function Parecidos({
@@ -259,32 +306,19 @@ function Parecidos({
       <ul className={cn("-mx-2 flex flex-col", desatualizado && "opacity-60")}>
         {dados.map((s) => (
           <li key={s.localId}>
-            <button
-              type="button"
-              aria-pressed={s.localId === localId}
-              // Não tira o foco do campo que está sendo editado.
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onEscolher(s.localId)}
-              className={cn(
-                "flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                s.localId === localId && "bg-surface-hover",
-              )}
+            <LinhaUsar
+              ativo={s.localId === localId}
+              rotulo={`Usar o local ${s.endereco}`}
+              onUsar={() => onEscolher(s.localId)}
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <EnderecoTag endereco={s.endereco} className="shrink-0" />
-                <span className="min-w-0 truncate text-muted-foreground" title={s.caminhoNomes}>
-                  {s.caminhoNomes}
-                </span>
-              </span>
+              <LinhaEndereco endereco={s.endereco} caminho={s.caminhoNomes} />
               <span className="text-xs">
                 {contagem(s.parecidos, "item parecido", "itens parecidos")}
               </span>
               {s.exemplos.length > 0 && (
-                <span className="truncate text-xs text-muted-foreground" title={s.exemplos.join(", ")}>
-                  {s.exemplos.join(", ")}
-                </span>
+                <span className="text-xs text-muted-foreground">{s.exemplos.join(", ")}</span>
               )}
-            </button>
+            </LinhaUsar>
           </li>
         ))}
       </ul>
@@ -319,29 +353,17 @@ function ResultadosBusca({
     return <Estado>Nenhum item com local encontrado.</Estado>;
   }
   return (
-    <ul className={cn("flex flex-col gap-3", desatualizado && "opacity-60")}>
+    <ul className={cn("-mx-2 flex flex-col", desatualizado && "opacity-60")}>
       {dados.map((r) => (
-        <li key={r.id} className="flex flex-col gap-1">
-          <span className="truncate" title={r.nome}>
-            {r.nome}
-          </span>
-          <span className="flex min-w-0 items-center gap-2">
-            <EnderecoTag endereco={r.endereco} className="shrink-0" />
-            <span className="min-w-0 truncate text-muted-foreground" title={r.caminhoNomes}>
-              {r.caminhoNomes}
-            </span>
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-fit"
-            // O botão some depois do clique; o foco fica onde estava.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onUsar(r.localId)}
+        <li key={r.id}>
+          <LinhaUsar
+            ativo={false}
+            rotulo={`Usar o local de ${r.nome}: ${r.endereco}`}
+            onUsar={() => onUsar(r.localId)}
           >
-            Usar este local
-          </Button>
+            <span className="break-words">{r.nome}</span>
+            <LinhaEndereco endereco={r.endereco} caminho={r.caminhoNomes} />
+          </LinhaUsar>
         </li>
       ))}
     </ul>
@@ -351,12 +373,15 @@ function ResultadosBusca({
 function Conteudo({
   endereco,
   consulta,
+  localId,
+  onEscolher,
 }: {
   endereco: string;
   consulta: Consulta<ConteudoLocal>;
+  localId: string | null;
+  onEscolher: (id: string) => void;
 }) {
   const { dados, desatualizado, erro } = consulta;
-  // O resultado anterior é de outro local: só serve para não piscar a lista.
   const vazio = dados && dados.itens.length === 0 && dados.filhos.length === 0;
 
   let corpo: React.ReactNode;
@@ -367,38 +392,43 @@ function Conteudo({
   } else if (vazio && !desatualizado) {
     corpo = <Estado>Local vazio.</Estado>;
   } else {
+    // Local filho: escolhe o filho. Item: escolhe o local mostrado.
     corpo = (
-      <div className={cn("flex flex-col gap-3", desatualizado && "opacity-60")}>
-        {dados.filhos.length > 0 && (
-          <ul className="flex flex-col gap-1">
-            {dados.filhos.map((f) => (
-              <li key={f.id} className="flex items-center gap-2" title={f.endereco}>
+      <ul className={cn("-mx-2 flex flex-col", desatualizado && "opacity-60")}>
+        {dados.filhos.map((f) => (
+          <li key={f.id}>
+            <LinhaUsar
+              ativo={f.id === localId}
+              rotulo={`Usar o local ${f.endereco}`}
+              onUsar={() => onEscolher(f.id)}
+            >
+              <span>
                 <span className="font-mono text-[13px]">{f.codigo}</span>
                 <span className="text-muted-foreground">
-                  · {contagem(f.itens, "item", "itens")}
+                  {` · ${contagem(f.itens, "item", "itens")}`}
                 </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {dados.itens.length > 0 && (
-          <ul className="flex flex-col gap-1.5">
-            {dados.itens.map((i) => (
-              <li key={i.id} className="flex min-w-0 flex-col">
-                <span className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span className="truncate" title={i.nome}>
-                    {i.nome}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {i.quantidade}
-                  </span>
+              </span>
+            </LinhaUsar>
+          </li>
+        ))}
+        {dados.itens.map((i) => (
+          <li key={i.id}>
+            <LinhaUsar
+              ativo={false}
+              rotulo={`Usar o local ${dados.endereco}, onde está ${i.nome}`}
+              onUsar={() => onEscolher(dados.localId)}
+            >
+              <span className="flex min-w-0 items-baseline justify-between gap-2">
+                <span className="break-words">{i.nome}</span>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {i.quantidade}
                 </span>
-                <span className="truncate text-xs text-muted-foreground">{i.categoria}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              </span>
+              <span className="text-xs text-muted-foreground">{i.categoria}</span>
+            </LinhaUsar>
+          </li>
+        ))}
+      </ul>
     );
   }
 

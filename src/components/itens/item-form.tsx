@@ -14,6 +14,7 @@ import { ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { criarItem, editarItem } from "@/app/(app)/itens/actions";
 import { Combobox } from "@/components/itens/combobox";
+import { DivisaoFormulario } from "@/components/itens/divisao-formulario";
 import { ExcluirItem } from "@/components/itens/excluir-item";
 import { opcoesCategoria, opcoesLocal } from "@/components/itens/opcoes";
 import { PainelLocal } from "@/components/itens/painel-local";
@@ -333,8 +334,9 @@ export function ItemForm({
   };
 
   return (
-    <div className="mt-6 grid gap-8 min-[1100px]:grid-cols-[minmax(0,640px)_360px]">
-      <div className="flex min-w-0 max-w-[640px] flex-col gap-4">
+    <DivisaoFormulario
+      formulario={
+      <div className="flex min-w-0 flex-col gap-4">
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {local
             ? `${local.itens} ${local.itens === 1 ? "item" : "itens"} neste local`
@@ -636,7 +638,10 @@ export function ItemForm({
           </div>
         </form>
       </div>
+      }
+      painel={(className) => (
       <PainelLocal
+        className={className}
         // Depois de salvar, a página recarrega as contagens dos locais: o painel
         // recomeça com o cache vazio.
         key={`${semLocal}:${locais.map((l) => l.itens).join(",")}`}
@@ -649,7 +654,8 @@ export function ItemForm({
         locais={locais}
         onEscolherLocal={(id) => set("localId", id)}
       />
-    </div>
+      )}
+    />
   );
 }
 

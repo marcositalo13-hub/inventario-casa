@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent as PointerEventReact,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
@@ -16,6 +24,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CategoriaRow } from "@/lib/itens";
+import {
+  COLUNAS_TABELA,
+  LARGURAS_PADRAO,
+  LARGURA_MINIMA,
+  LARGURA_SELECAO,
+  assinarLarguras,
+  gravarLarguras,
+  lerLarguras,
+  snapshotLarguras,
+  type ColunaTabela,
+  type Larguras,
+} from "@/lib/itens-colunas";
 import type { PessoaRow } from "@/lib/itens-data";
 import type { ColunaOrdem, Direcao } from "@/lib/itens-filtros";
 import type { LocalRow } from "@/lib/locais";
@@ -55,11 +75,14 @@ function CabecalhoOrdenavel({
   coluna,
   ordenacao,
   className,
+  alca,
   children,
 }: {
   coluna: ColunaOrdem;
   ordenacao: Ordenacao;
   className?: string;
+  /** Alça de redimensionar, na borda direita. */
+  alca?: ReactNode;
   children: ReactNode;
 }) {
   const ativo = ordenacao.ordem === coluna;
@@ -77,7 +100,7 @@ function CabecalhoOrdenavel({
             : "descending"
           : undefined
       }
-      className={className}
+      className={cn("relative", className)}
     >
       <Link
         href={ordenacao.hrefs[coluna]}
@@ -97,8 +120,40 @@ function CabecalhoOrdenavel({
           )}
         />
       </Link>
+      {alca}
     </TableHead>
   );
+}
+
+/**
+ * Borda direita arrastável de um cabeçalho (4px). Duplo clique volta a coluna
+ * ao padrão.
+ */
+function AlcaColuna({
+  rotulo,
+  onPointerDown,
+  onDoubleClick,
+}: {
+  rotulo: string;
+  onPointerDown: (event: PointerEventReact<HTMLSpanElement>) => void;
+  onDoubleClick: () => void;
+}) {
+  return (
+    <span
+      aria-hidden
+      title={`Arraste para ajustar a largura de ${rotulo}; duplo clique volta ao padrão`}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
+      className="absolute top-0 -right-0.5 z-10 h-full w-1 cursor-col-resize touch-none select-none hover:bg-border"
+    />
+  );
+}
+
+/** Largura do tag mais longo: fonte mono de 13px (~7,85px por caractere). */
+function minimoEndereco(linhas: { endereco: string | null }[]): number {
+  const maior = Math.max(9, ...linhas.map((l) => (l.endereco ?? "").length));
+  // + padding e borda do tag (18) + padding da célula (16).
+  return Math.max(LARGURA_MINIMA, Math.ceil(maior * 7.85) + 34);
 }
 
 export function TabelaItens({
@@ -121,6 +176,66 @@ export function TabelaItens({
 }) {
   const router = useRouter();
   const sufixo = voltar ? `?voltar=${encodeURIComponent(voltar)}` : "";
+
+  // Larguras das colunas: salvas no localStorage; durante o arraste, só no estado.
+  const salvas = lerLarguras(
+    useSyncExternalStore(assinarLarguras, snapshotLarguras, () => null),
+  );
+  const [arraste, setArraste] = useState<{ coluna: ColunaTabela; largura: number } | null>(
+    null,
+  );
+  const minEndereco = useMemo(() => minimoEndereco(linhas), [linhas]);
+  const minimo = (coluna: ColunaTabela) =>
+    coluna === "endereco" ? minEndereco : LARGURA_MINIMA;
+  const larguras = Object.fromEntries(
+    COLUNAS_TABELA.map((c) => {
+      const base =
+        arraste?.coluna === c ? arraste.largura : (salvas[c] ?? LARGURAS_PADRAO[c]);
+      return [c, Math.max(minimo(c), base)];
+    }),
+  ) as Larguras;
+  const larguraTotal =
+    LARGURA_SELECAO + COLUNAS_TABELA.reduce((soma, c) => soma + larguras[c], 0);
+
+  function iniciarArraste(coluna: ColunaTabela, event: PointerEventReact<HTMLSpanElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const alca = event.currentTarget;
+    alca.setPointerCapture(event.pointerId);
+    const inicioX = event.clientX;
+    const inicio = larguras[coluna];
+    let atual = inicio;
+
+    function mover(e: PointerEvent) {
+      atual = Math.max(minimo(coluna), Math.round(inicio + e.clientX - inicioX));
+      setArraste({ coluna, largura: atual });
+    }
+    function soltar() {
+      alca.removeEventListener("pointermove", mover);
+      alca.removeEventListener("pointerup", soltar);
+      alca.removeEventListener("pointercancel", soltar);
+      setArraste(null);
+      if (atual !== inicio) gravarLarguras({ ...salvas, [coluna]: atual });
+    }
+    alca.addEventListener("pointermove", mover);
+    alca.addEventListener("pointerup", soltar);
+    alca.addEventListener("pointercancel", soltar);
+  }
+
+  function redefinirColuna(coluna: ColunaTabela) {
+    const restantes = { ...salvas };
+    delete restantes[coluna];
+    gravarLarguras(restantes);
+  }
+
+  const alca = (coluna: ColunaTabela, rotulo: string) => (
+    <AlcaColuna
+      rotulo={rotulo}
+      onPointerDown={(e) => iniciarArraste(coluna, e)}
+      onDoubleClick={() => redefinirColuna(coluna)}
+    />
+  );
 
   // Seleção da edição em massa. A página troca a key deste componente quando
   // filtros ou ordenação mudam, o que zera a seleção.
@@ -189,12 +304,20 @@ export function TabelaItens({
 
   return (
     <>
-      {/* table-fixed: as larguras abaixo valem e o texto longo é cortado. 976px é a
-        largura útil do conteúdo a 1280px de tela; abaixo disso a tabela rola. */}
-      <Table className="min-w-[976px] table-fixed">
+      {/* table-fixed: as larguras em px valem e o texto longo é cortado. A última
+        coluna, vazia e sem largura, ocupa o que sobra do container; a tabela só
+        rola na horizontal se as larguras somadas passarem dele. */}
+      <Table className="table-fixed" style={{ minWidth: larguraTotal }}>
+        <colgroup>
+          <col style={{ width: LARGURA_SELECAO }} />
+          {COLUNAS_TABELA.map((c) => (
+            <col key={c} style={{ width: larguras[c] }} />
+          ))}
+          <col />
+        </colgroup>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="w-10">
+            <TableHead>
               <Checkbox
                 aria-label={
                   todos
@@ -214,42 +337,51 @@ export function TabelaItens({
             <CabecalhoOrdenavel
               coluna="nome"
               ordenacao={ordenacao}
-              className="w-[26%]"
+              alca={alca("nome", "Nome")}
             >
               Nome
             </CabecalhoOrdenavel>
             <CabecalhoOrdenavel
               coluna="categoria"
               ordenacao={ordenacao}
-              className="w-[20%]"
+              alca={alca("categoria", "Categoria")}
             >
               Categoria
             </CabecalhoOrdenavel>
-            <CabecalhoOrdenavel coluna="endereco" ordenacao={ordenacao}>
+            <CabecalhoOrdenavel
+              coluna="endereco"
+              ordenacao={ordenacao}
+              alca={alca("endereco", "Endereço")}
+            >
               Endereço
             </CabecalhoOrdenavel>
             <CabecalhoOrdenavel
               coluna="qtd"
               ordenacao={ordenacao}
-              className="w-[6%] text-right"
+              className="text-right"
+              alca={alca("qtd", "Qtd")}
             >
               Qtd
             </CabecalhoOrdenavel>
-            <TableHead className="w-[10%]">Situação</TableHead>
+            <TableHead className="relative">
+              Situação
+              {alca("situacao", "Situação")}
+            </TableHead>
             <CabecalhoOrdenavel
               coluna="cadastrado"
               ordenacao={ordenacao}
-              className="w-[11%]"
+              alca={alca("cadastrado", "Cadastrado")}
             >
               Cadastrado
             </CabecalhoOrdenavel>
             <CabecalhoOrdenavel
               coluna="atualizado"
               ordenacao={ordenacao}
-              className="w-[11%]"
+              alca={alca("atualizado", "Atualizado")}
             >
               Atualizado
             </CabecalhoOrdenavel>
+            <TableHead aria-hidden className="p-0" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -320,6 +452,7 @@ export function TabelaItens({
                   {l.atualizado}
                 </time>
               </TableCell>
+              <TableCell aria-hidden className="p-0" />
             </TableRow>
           ))}
         </TableBody>
